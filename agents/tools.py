@@ -1,15 +1,3 @@
-"""
-agents/tools.py
-────────────────
-LangChain Tool definitions that wrap the RAG system.
-
-Uses modern LCEL (LangChain Expression Language) style:
-    OLD:  LLMChain(llm=llm, prompt=prompt).invoke(...)
-    NEW:  (prompt | llm | StrOutputParser()).invoke(...)
-
-The pipe `|` chains: prompt → llm → output parser, same idea but no deprecated classes.
-"""
-
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

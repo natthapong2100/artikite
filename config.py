@@ -1,10 +1,3 @@
-"""
-config.py
-─────────
-Central configuration for the Art History RAG Agentic System.
-Change settings here — everything else reads from this file.
-"""
-
 # ── Ollama ──────────────────────────────────────────────
 OLLAMA_BASE_URL   = "http://localhost:11434"
 OLLAMA_LLM_MODEL  = "llama3.1"          # For text generation

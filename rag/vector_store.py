@@ -1,26 +1,3 @@
-"""
-rag/vector_store.py
-────────────────────
-ChromaDB setup, document ingestion, and semantic retrieval.
-
-Responsibilities:
-    1. Create and persist a ChromaDB collection
-    2. Ingest art history documents (chunking + embedding + storing)
-    3. Retrieve relevant chunks for a given query (semantic search)
-
-Why chunk documents?
-    LLMs have a context window limit. A full article might be 2000+ tokens.
-    By splitting into smaller chunks (e.g., 400 characters), we only feed
-    the most relevant parts to the LLM — keeping responses focused and fast.
-
-ChromaDB concepts:
-    Collection  = like a table in a SQL database
-    Document    = the raw text chunk
-    Embedding   = the vector representation of the chunk
-    Metadata    = extra info stored alongside (title, category, chunk index)
-    ID          = unique string identifier for each chunk
-"""
-
 import chromadb
 import sys
 import os

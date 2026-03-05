@@ -1,19 +1,3 @@
-"""
-rag/embedder.py
-────────────────
-Handles text → vector embedding using Ollama.
-
-Why a separate file?
-    The embedding model is independent from the LLM model.
-    By isolating it here, you can swap embedding models (e.g., switch from
-    nomic-embed-text to mxbai-embed-large) without touching any other file.
-
-How it works:
-    Ollama exposes a /api/embeddings endpoint.
-    We call it with a text string → get back a float list (the embedding vector).
-    ChromaDB stores these vectors and uses cosine similarity to find similar chunks.
-"""
-
 import requests
 import config
 

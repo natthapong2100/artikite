@@ -1,27 +1,3 @@
-"""
-agents/crew.py
-───────────────
-CrewAI multi-agent crew for Art History analysis.
-
-The Crew:
-    ┌─────────────────────────────────────────────────────┐
-    │                  ART HISTORY CREW                   │
-    │                                                     │
-    │  🔬 ResearchSpecialist  → Gathers facts via RAG     │
-    │       ↓ (output used as context)                    │
-    │  🎨 ArtCritic           → Writes cultural analysis  │
-    │       ↓ (output used as context)                    │
-    │  📝 MuseumCurator       → Final review & polish     │
-    └─────────────────────────────────────────────────────┘
-
-Key CrewAI concepts demonstrated:
-    - Agent: role + goal + backstory + tools
-    - Task: description + expected_output + agent + context (dependencies)
-    - Crew: agents + tasks + process type
-    - Process.sequential: tasks run in order, each sees previous outputs
-    - allow_delegation: whether an agent can hand off to another
-"""
-
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

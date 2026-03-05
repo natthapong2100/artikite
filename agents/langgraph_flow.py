@@ -1,15 +1,3 @@
-"""
-agents/langgraph_flow.py
-─────────────────────────
-LangGraph stateful workflow for the Art History Research pipeline.
-
-Graph structure:
-    PLANNER → RESEARCHER → WRITER → VALIDATOR ──(valid)──▶ END
-                                         ▲                   
-                                         │                   
-                                      REVISER ◀──(needs work)─┘
-"""
-
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

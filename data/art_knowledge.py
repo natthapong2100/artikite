@@ -1,18 +1,3 @@
-"""
-data/art_knowledge.py
-──────────────────────
-Art history knowledge corpus.
-In a real project this would be loaded from PDFs, Wikipedia, books, etc.
-Each entry is a "document" that will be chunked and stored in ChromaDB.
-
-Structure:
-    ART_DOCUMENTS = list of dicts with:
-        - id       : unique identifier
-        - title    : document title (stored as metadata)
-        - category : movement / artist / period (metadata for filtering)
-        - content  : the actual text to embed and retrieve
-"""
-
 ART_DOCUMENTS = [
 
     # ── RENAISSANCE ─────────────────────────────────────────────
