@@ -1,6 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import threading
 from langchain_core.tools import Tool
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
@@ -11,12 +12,14 @@ from rag.vector_store import retrieve, format_retrieved_context, ingest_document
 
 # ── Shared state: load collection once ───────────────────────────────────────
 _collection = None
+_collection_lock = threading.Lock()
 
 def get_collection():
     """Lazy-load the ChromaDB collection (ingest on first call if needed)."""
     global _collection
-    if _collection is None:
-        _collection = ingest_documents()
+    with _collection_lock:
+        if _collection is None:
+            _collection = ingest_documents()
     return _collection
 
 

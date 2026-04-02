@@ -16,6 +16,7 @@ llm = OllamaLLM(
     model=config.OLLAMA_LLM_MODEL,
     base_url=config.OLLAMA_BASE_URL,
     temperature=config.LLM_TEMPERATURE,
+    num_predict=config.LLM_MAX_TOKENS,
 )
 parser = StrOutputParser()
 
