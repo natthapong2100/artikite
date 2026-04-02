@@ -67,9 +67,10 @@ def create_research_specialist() -> Agent:
         artworks, dates, and sources. You never make up facts. When information isn't
         in the knowledge base, you say so clearly.""",
         llm=crewai_llm,
-        tools=[art_search_tool, artist_search_tool, movement_search_tool],
+        tools=[art_search_tool, artist_search_tool, movement_search_tool], # gather the tools into particular agent
         verbose=config.CREW_VERBOSE,
         allow_delegation=False,  # Researchers don't delegate — they do the work
+        max_execution_time=60,
     )
 
 
@@ -94,6 +95,7 @@ def create_art_critic() -> Agent:
         tools=[compare_tool],  # Can use comparison tool for analysis
         verbose=config.CREW_VERBOSE,
         allow_delegation=False,
+        max_execution_time=60,
     )
 
 
@@ -117,7 +119,8 @@ def create_museum_curator() -> Agent:
         llm=crewai_llm,
         tools=[art_search_tool],  # Can do fact-checking lookups
         verbose=config.CREW_VERBOSE,
-        allow_delegation=True,  # Curator CAN delegate back to critic
+        allow_delegation=False,  # if True, Curator CAN delegate back to the research specialist
+        max_execution_time=90,
     )
 
 

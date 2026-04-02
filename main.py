@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 # Make sure imports work from project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -125,18 +126,28 @@ def run(query: str = None):
 
     print(f"\n  📝 Query: {query}")
 
-    # ── Step 3: LangGraph Workflow ───────────────────────────────────────────
-    print_section("STEP 3: LangGraph Research Workflow", "═")
-    print("  Running: Planner → Researcher (RAG) → Writer → Validator → [Reviser]")
+    # ── Steps 3 & 4: LangGraph + CrewAI in parallel ─────────────────────────
+    # print_section("STEPS 3 & 4: LangGraph + CrewAI running in parallel", "═")
+    # print("  LangGraph: Planner → Researcher → Writer → Validator → [Reviser]")
+    # print("  CrewAI:    Research Specialist → Art Critic → Museum Curator")
+    # print("  (both pipelines running at the same time)\n")
+
+    # with ThreadPoolExecutor(max_workers=2) as executor:
+    #     f_langgraph = executor.submit(run_langgraph_research, query)
+    #     f_crew      = executor.submit(run_crew_analysis, query)
+    #     langgraph_result = f_langgraph.result()
+    #     crew_result      = f_crew.result()
+    
+    
+    print_section("STEPS 3 & 4: LangGraph → CrewAI running sequentially", "═")
+    print("  LangGraph: Planner → Researcher → Writer → Validator → [Reviser]")
+    print("  CrewAI:    Research Specialist → Art Critic → Museum Curator\n")
+
     langgraph_result = run_langgraph_research(query)
+    crew_result      = run_crew_analysis(query)
 
     print_section("LangGraph Final Essay", "─")
     print(langgraph_result["final_essay"])
-
-    # ── Step 4: CrewAI Analysis ──────────────────────────────────────────────
-    print_section("STEP 4: CrewAI Multi-Agent Analysis", "═")
-    print("  Running: Research Specialist → Art Critic → Museum Curator")
-    crew_result = run_crew_analysis(query)
 
     print_section("CrewAI Final Analysis", "─")
     print(crew_result)

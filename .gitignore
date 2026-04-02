@@ -1,3 +1,8 @@
 /.DS_Store
 /__pycache__
 /notes/
+*.env.local
+*.pyc
+.gitignore
+agents/__pycache__/
+data/__pycache__/
