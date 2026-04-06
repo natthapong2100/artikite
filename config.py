@@ -22,3 +22,6 @@ MAX_REVISION_LOOPS  = 0     # Max times the validator can send work back, but is
 
 # ── CrewAI ──────────────────────────────────────────────
 CREW_VERBOSE        = True # true is to show the thinking process of the agents, false is to only show final output
+
+# ── Museum APIs ──────────────────────────────────────────
+MET_API_BASE        = "https://collectionapi.metmuseum.org/public/collection/v1"

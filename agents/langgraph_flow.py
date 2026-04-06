@@ -9,6 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 import config
 from agents.tools import art_search_tool, artist_search_tool, movement_search_tool
+from agents.museum_tools import met_search_tool
 
 
 # ── LLM + Parser (shared across all nodes) ───────────────────────────────────
@@ -66,37 +67,78 @@ Q3: [specific question about influence or significance]"""
     }
 
 
+def _route_sources(query: str) -> list[str]:
+    """
+    Use the LLM to decide which data source(s) to query.
+    The LLM understands institution names, places, and context.
+    qwen3 emits <think>…</think> tokens — stripped before parsing.
+    """
+    import re
+
+    prompt = PromptTemplate.from_template(
+        """You are a routing agent for an art history research system.
+
+Question: {query}
+
+Sources:
+- chromadb : general art history knowledge — use for questions about movements, periods, styles, biographies, historical context, or influence
+- met      : Metropolitan Museum of Art live collection — use ONLY when the question specifically asks what the MET has, owns, or holds
+
+Rules:
+- If the question asks about a specific museum's collection or holdings, use ONLY that museum's source
+- If the question is about art history in general (even if it mentions a known artist), use chromadb
+- If the question combines both (e.g. "Tell me about Van Gogh and what the MET has"), use both
+
+
+Output ONLY a comma-separated list. No explanation.
+Valid tokens: chromadb, met
+
+Answer:"""
+    )
+    chain = prompt | llm | parser
+    raw = chain.invoke({"query": query})
+
+    # Strip qwen3 <think>…</think> reasoning block if present
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+
+    valid = {"chromadb", "met"}
+    chosen = [s.strip().lower() for s in raw.replace('"', '').split(",")]
+    sources = [s for s in chosen if s in valid]
+    print(f"     Parsed sources: {sources}")
+    return sources or ["chromadb", "met"]  # fallback: general knowledge
+
+
 def researcher_node(state: ArtResearchState) -> ArtResearchState:
-    """Node 2: Execute research using RAG tools (ChromaDB)."""
+    """Node 2: Route to the right data sources (ChromaDB / MET / MOMA) then research."""
     print("\n  🔍  [LangGraph] RESEARCHER node running...")
 
     query = state["query"]
 
-    print("     → Calling ArtHistorySearch (RAG)...")
-    general_info = art_search_tool.func(query)
+    # ── Step 1: LLM decides which sources to query ────────────────────────────
+    sources = _route_sources(query)
+    print(f"     🧭 Router chose: {sources}")
 
-    print("     → Calling ArtistSearch (RAG, artist filter)...")
-    artist_info = artist_search_tool.func(query)
+    # ── Step 2: Query only the selected sources ───────────────────────────────
+    parts = []
 
-    print("     → Calling MovementSearch (RAG, movement filter)...")
-    movement_info = movement_search_tool.func(query)
+    if "chromadb" in sources:
+        print("     → ArtHistorySearch (ChromaDB RAG)...")
+        parts.append("=== ART HISTORY KNOWLEDGE BASE ===\n" + art_search_tool.func(query))
+        print("     → ArtistSearch (ChromaDB RAG)...")
+        parts.append("=== ARTIST PROFILES ===\n" + artist_search_tool.func(query))
+        print("     → MovementSearch (ChromaDB RAG)...")
+        parts.append("=== MOVEMENTS & PERIODS ===\n" + movement_search_tool.func(query))
 
-    compiled = f"""
-=== GENERAL ART HISTORY CONTEXT ===
-{general_info}
+    if "met" in sources:
+        print("     → METMuseumSearch (live API)...")
+        parts.append("=== MET MUSEUM COLLECTION (live) ===\n" + met_search_tool.func(query))
 
-=== ARTIST INFORMATION ===
-{artist_info}
-
-=== MOVEMENT & PERIOD CONTEXT ===
-{movement_info}
-""".strip()
-
-    print(f"     Research compiled: {len(compiled)} chars")
+    compiled = "\n\n".join(parts)
+    print(f"     Research compiled: {len(compiled)} chars from {sources}")
     return {
         **state,
         "raw_research": compiled,
-        "log": state["log"] + ["RESEARCHER: Retrieved content from ChromaDB via 3 RAG tools"]
+        "log": state["log"] + [f"RESEARCHER: Queried {sources}"]
     }
 
 
