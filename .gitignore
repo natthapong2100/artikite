@@ -3,6 +3,5 @@
 /notes/
 *.env.local
 *.pyc
-.gitignore
 agents/__pycache__/
 data/__pycache__/

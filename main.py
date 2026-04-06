@@ -10,6 +10,7 @@ import config
 from rag.vector_store import ingest_documents
 from agents.langgraph_flow import run_langgraph_research
 from agents.crew import run_crew_analysis
+from agents import mcp_client
 
 
 # ── Sample queries (great for interview demos) ────────────────────────────────
@@ -106,9 +107,14 @@ def run(query: str = None):
     collection = ingest_documents()
     print(f"  ✅ Vector store ready with {collection.count()} chunks")
 
-    # ── Step 2: Get query ────────────────────────────────────────────────────
+    # ── Step 2: Connect to Museum MCP Server ─────────────────────────────────
+    print_section("STEP 2: Connecting to Museum MCP Server", "═")
+    mcp_client.connect()
+    print("  ✅ MCP session ready")
+
+    # ── Step 3: Get query ────────────────────────────────────────────────────
     if query is None:
-        print_section("STEP 2: Choose Your Query", "═")
+        print_section("STEP 3: Choose Your Query", "═")
         print("\n  Sample queries:")
         for i, q in enumerate(SAMPLE_QUERIES, 1):
             print(f"  [{i}] {q}")
@@ -139,7 +145,7 @@ def run(query: str = None):
     #     crew_result      = f_crew.result()
     
     
-    print_section("STEPS 3 & 4: LangGraph → CrewAI running sequentially", "═")
+    print_section("STEPS 4 & 5: LangGraph → CrewAI running sequentially", "═")
     print("  LangGraph: Planner → Researcher → Writer → Validator → [Reviser]")
     print("  CrewAI:    Research Specialist → Art Critic → Museum Curator\n")
 
@@ -152,8 +158,8 @@ def run(query: str = None):
     print_section("CrewAI Final Analysis", "─")
     print(crew_result)
 
-    # ── Step 5: Save Report ──────────────────────────────────────────────────
-    print_section("STEP 5: Saving Report", "═")
+    # ── Step 6: Save Report ──────────────────────────────────────────────────
+    print_section("STEP 6: Saving Report", "═")
     report_path = save_report(query, langgraph_result, crew_result)
     print(f"\n  💾 Report saved to: {report_path}")
 
@@ -172,7 +178,8 @@ def run(query: str = None):
   ✅ LangGraph  — Stateful workflow with conditional routing
   ✅ CrewAI     — Role-based multi-agent collaboration
   ✅ ChromaDB   — Vector DB for semantic retrieval (RAG)
-  ✅ Ollama     — Local Llama3.1 (no API keys needed)
+  ✅ Ollama     — Local inference (no API keys needed)
+  ✅ MCP        — Museum tool transport (MET API via MCP protocol)
 """)
 
 

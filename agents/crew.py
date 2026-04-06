@@ -4,11 +4,34 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from crewai import Agent, Task, Crew, Process, LLM
 
 import config
-# from agents.tools import art_search_tool, artist_search_tool, movement_search_tool, compare_tool
 
-# from agents.tools import art_search_tool, artist_search_tool, movement_search_tool, compare_tool
+
+def _detect_sources(query: str) -> list[str]:
+    """Route using the same LLM logic as LangGraph."""
+    from agents.langgraph_flow import _route_sources
+    return _route_sources(query)
+
+
+def _build_tool_instructions(sources: list[str]) -> str:
+    """Return the tool-use paragraph for the research task based on routing decision."""
+    if "met" in sources:
+        return (
+            "Use your METMuseumSearch tool to retrieve live artworks from the Metropolitan Museum."
+        )
+    return (
+        "Use your ArtHistorySearch, ArtistSearch, and MovementSearch tools to gather "
+        "comprehensive information from the art history knowledge base."
+    )
+
+
 from crewai.tools import tool as crewai_tool
 from agents.tools import art_history_search, artist_focused_search, movement_focused_search, compare_art_subjects
+from agents.museum_tools import met_search
+
+@crewai_tool("METMuseumSearch")
+def met_search_tool(query: str) -> str:
+    """Search the Metropolitan Museum of Art collection for real artworks, artists, and periods."""
+    return met_search(query)
 
 @crewai_tool("ArtHistorySearch")
 def art_search_tool(query: str) -> str:
@@ -67,7 +90,7 @@ def create_research_specialist() -> Agent:
         artworks, dates, and sources. You never make up facts. When information isn't
         in the knowledge base, you say so clearly.""",
         llm=crewai_llm,
-        tools=[art_search_tool, artist_search_tool, movement_search_tool], # gather the tools into particular agent
+        tools=[art_search_tool, artist_search_tool, movement_search_tool, met_search_tool],
         verbose=config.CREW_VERBOSE,
         allow_delegation=False,  # Researchers don't delegate — they do the work
         max_execution_time=60,
@@ -127,17 +150,22 @@ def create_museum_curator() -> Agent:
 # ── Task Definitions ──────────────────────────────────────────────────────────
 
 def create_tasks(query: str, research_agent: Agent,
-                 critic_agent: Agent, curator_agent: Agent) -> list[Task]:
+                 critic_agent: Agent, curator_agent: Agent,
+                 sources: list[str] | None = None) -> list[Task]:
     """
     Create the three tasks for the crew.
     Note how each task builds on the previous via the `context` parameter.
     """
+    if sources is None:
+        sources = _detect_sources(query)
+
+    tool_instructions = _build_tool_instructions(sources)
+    print(f"     🧭 CrewAI router chose: {sources}")
 
     research_task = Task(
         description=f"""Research the following art history topic thoroughly: "{query}"
 
-        Use your ArtHistorySearch, ArtistSearch, and MovementSearch tools to gather
-        comprehensive information.
+        {tool_instructions}
 
         Your research MUST include:
         1. Key artists involved (names, dates, nationalities)
@@ -229,13 +257,16 @@ def run_crew_analysis(query: str) -> str:
     """
     print(f"\n  Assembling Art History Crew for: '{query}'")
 
+    # Detect which sources to use (same keyword logic as LangGraph router)
+    sources = _detect_sources(query)
+
     # Create agents
     research_agent = create_research_specialist()
     critic_agent = create_art_critic()
     curator_agent = create_museum_curator()
 
-    # Create tasks
-    tasks = create_tasks(query, research_agent, critic_agent, curator_agent)
+    # Create tasks with routing-aware instructions
+    tasks = create_tasks(query, research_agent, critic_agent, curator_agent, sources=sources)
 
     # Assemble crew
     crew = Crew(
