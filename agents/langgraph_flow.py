@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, re
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import TypedDict, List
@@ -9,7 +9,17 @@ from langchain_core.output_parsers import StrOutputParser
 
 import config
 from agents.tools import art_search_tool, artist_search_tool, movement_search_tool
-from agents.museum_tools import met_search_tool
+from agents.museum_tools import met_search_tool, met_get_artwork_tool
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def strip_think(text: str) -> str:
+    """Remove qwen3 <think>...</think> reasoning blocks before using LLM output.
+    Also handles truncated blocks where </think> was cut off by num_predict."""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)  # complete blocks
+    text = re.sub(r"<think>.*$", "", text, flags=re.DOTALL)           # truncated blocks
+    return text.strip()
 
 
 # ── LLM + Parser (shared across all nodes) ───────────────────────────────────
@@ -57,7 +67,7 @@ Q3: [specific question about influence or significance]"""
     )
 
     chain = prompt | llm | parser
-    plan = chain.invoke({"query": state["query"]})
+    plan = strip_think(chain.invoke({"query": state["query"]}))
 
     print(f"     Plan: {plan[:100]}...")
     return {
@@ -131,7 +141,12 @@ def researcher_node(state: ArtResearchState) -> ArtResearchState:
 
     if "met" in sources:
         print("     → METMuseumSearch (live API)...")
-        parts.append("=== MET MUSEUM COLLECTION (live) ===\n" + met_search_tool.func(query))
+        search_results = met_search_tool.func(query)
+        parts.append("=== MET MUSEUM COLLECTION (live) ===\n" + search_results)
+        ids = re.findall(r'\[(\d+)\]', search_results)
+        if ids:
+            print(f"     → METGetArtwork (live API, ID {ids[0]})...")
+            parts.append("=== MET ARTWORK DETAIL ===\n" + met_get_artwork_tool.func(ids[0]))
 
     compiled = "\n\n".join(parts)
     print(f"     Research compiled: {len(compiled)} chars from {sources}")
@@ -167,11 +182,11 @@ Write in an engaging, authoritative tone. Cite specific artworks and dates."""
     )
 
     chain = prompt | llm | parser
-    draft = chain.invoke({
+    draft = strip_think(chain.invoke({
         "query": state["query"],
         "plan": state["research_plan"],
         "research": state["raw_research"]
-    })
+    }))
 
     print(f"     Draft written: {len(draft)} chars")
     return {
@@ -184,6 +199,32 @@ Write in an engaging, authoritative tone. Cite specific artworks and dates."""
 def validator_node(state: ArtResearchState) -> ArtResearchState:
     """Node 4: Review quality and set routing status."""
     print("\n  ✅  [LangGraph] VALIDATOR node running...")
+
+    # ── Heuristic pre-checks (fast, no LLM) ──────────────────────────────────
+    draft = state["draft_essay"]
+    issues = []
+    if len(draft) < 300:
+        issues.append("Essay is too short (under 300 characters).")
+    # required_sections = ["## Introduction", "## Key Findings", "## Historical Significance", "## Conclusion"]
+    # missing = [s for s in required_sections if s not in draft]
+    
+    draft_lower = draft.lower()
+    required_sections = ["## introduction", "## key findings", "## historical significance", "## conclusion"]
+    missing = [s for s in required_sections if s not in draft_lower]
+    
+    if missing:
+        issues.append(f"Missing required sections: {', '.join(missing)}.")
+
+    if issues:
+        feedback = "Pre-check failed: " + " ".join(issues)
+        print(f"     Pre-check FAILED: {feedback}")
+        return {
+            **state,
+            "validation_feedback": feedback,
+            "validation_status": "NEEDS_IMPROVEMENT",
+            "final_essay": draft,
+            "log": state["log"] + [f"VALIDATOR: Pre-check failed — {feedback}"]
+        }
 
     prompt = PromptTemplate.from_template(
         """You are a strict art history editor. Review this draft essay.
@@ -209,10 +250,10 @@ Your review:"""
     )
 
     chain = prompt | llm | parser
-    review = chain.invoke({
+    review = strip_think(chain.invoke({
         "query": state["query"],
         "draft": state["draft_essay"]
-    })
+    }))
 
     status = "VALID" if ("VALID" in review.upper() and "NEEDS_IMPROVEMENT" not in review.upper()) else "NEEDS_IMPROVEMENT"
 
@@ -246,11 +287,11 @@ artworks, dates, and historical context where needed."""
     )
 
     chain = prompt | llm | parser
-    revised = chain.invoke({
+    revised = strip_think(chain.invoke({
         "draft": state["draft_essay"],
         "feedback": state["validation_feedback"],
         "query": state["query"]
-    })
+    }))
 
     return {
         **state,
