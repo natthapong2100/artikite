@@ -26,12 +26,17 @@ def _build_tool_instructions(sources: list[str]) -> str:
 
 from crewai.tools import tool as crewai_tool
 from agents.tools import art_history_search, artist_focused_search, movement_focused_search, compare_art_subjects
-from agents.museum_tools import met_search
+from agents.museum_tools import met_search, met_get_artwork
 
 @crewai_tool("METMuseumSearch")
 def met_search_tool(query: str) -> str:
     """Search the Metropolitan Museum of Art collection for real artworks, artists, and periods."""
     return met_search(query)
+
+@crewai_tool("METGetArtwork")
+def met_get_artwork_tool(object_id: str) -> str:
+    """Get full details for a specific MET artwork by its object ID (e.g. '437329'). Use METMuseumSearch first to find IDs."""
+    return met_get_artwork(object_id)
 
 @crewai_tool("ArtHistorySearch")
 def art_search_tool(query: str) -> str:
@@ -90,10 +95,10 @@ def create_research_specialist() -> Agent:
         artworks, dates, and sources. You never make up facts. When information isn't
         in the knowledge base, you say so clearly.""",
         llm=crewai_llm,
-        tools=[art_search_tool, artist_search_tool, movement_search_tool, met_search_tool],
+        tools=[art_search_tool, artist_search_tool, movement_search_tool, met_search_tool, met_get_artwork_tool],
         verbose=config.CREW_VERBOSE,
         allow_delegation=False,  # Researchers don't delegate — they do the work
-        max_execution_time=60,
+        max_execution_time=90,
     )
 
 
@@ -118,7 +123,7 @@ def create_art_critic() -> Agent:
         tools=[compare_tool],  # Can use comparison tool for analysis
         verbose=config.CREW_VERBOSE,
         allow_delegation=False,
-        max_execution_time=60,
+        max_execution_time=90,
     )
 
 

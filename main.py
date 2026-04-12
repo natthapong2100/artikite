@@ -9,12 +9,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 from rag.vector_store import ingest_documents
 from agents.langgraph_flow import run_langgraph_research
+from agents.guardrails import validate_query, validate_output
 from agents.crew import run_crew_analysis
 from agents import mcp_client
 
 
 # ── Sample queries (great for interview demos) ────────────────────────────────
 SAMPLE_QUERIES = [
+    "What artworks does the MET have by Van Gogh?",
+    "Show me Monet paintings in the MET collection",
+    "Who was Claude Monet?",
     "How did Leonardo da Vinci revolutionize Renaissance painting?",
     "Compare Baroque and Impressionism as artistic movements",
     "What makes Van Gogh's style unique and why was he so influential?",
@@ -130,6 +134,14 @@ def run(query: str = None):
             query = SAMPLE_QUERIES[0]
             print(f"  Using default: {query}")
 
+    # ── Safety check ─────────────────────────────────────────────────────────
+    print("\n  Running safety check...")
+    ok, reason = validate_query(query)
+    if not ok:
+        print(f"\n  ⛔ Query rejected — {reason}")
+        return
+    print("  ✅ Safety check passed")
+
     print(f"\n  📝 Query: {query}")
 
     # ── Steps 3 & 4: LangGraph + CrewAI in parallel ─────────────────────────
@@ -149,8 +161,31 @@ def run(query: str = None):
     print("  LangGraph: Planner → Researcher → Writer → Validator → [Reviser]")
     print("  CrewAI:    Research Specialist → Art Critic → Museum Curator\n")
 
-    langgraph_result = run_langgraph_research(query)
-    crew_result      = run_crew_analysis(query)
+    # try:
+    #     langgraph_result = run_langgraph_research(query)
+    #     crew_result      = run_crew_analysis(query)
+    # finally:
+    #     mcp_client.disconnect()
+
+    # print_section("LangGraph Final Essay", "─")
+    # print(langgraph_result["final_essay"])
+
+    # print_section("CrewAI Final Analysis", "─")
+    # print(crew_result)
+    
+    langgraph_result = None
+    crew_result = None
+    try:
+        langgraph_result = run_langgraph_research(query)
+        crew_result = run_crew_analysis(query)
+    except Exception as e:
+        print(f"\n  ❌ Pipeline error: {e}")
+    finally:
+        mcp_client.disconnect()
+
+    if not langgraph_result or not crew_result:
+        print("\n  ⛔ Pipeline did not complete — no report saved.")
+        return
 
     print_section("LangGraph Final Essay", "─")
     print(langgraph_result["final_essay"])
@@ -158,8 +193,17 @@ def run(query: str = None):
     print_section("CrewAI Final Analysis", "─")
     print(crew_result)
 
-    # ── Step 6: Save Report ──────────────────────────────────────────────────
-    print_section("STEP 6: Saving Report", "═")
+    # ── Step 6: Output Safety Check ──────────────────────────────────────────
+    print_section("STEP 6: Output Safety Check", "═")
+    ok, reason = validate_output(langgraph_result["final_essay"], query)
+    if not ok:
+        print(f"\n  ⚠️  Output guardrail flagged: {reason}")
+        print("  Report will NOT be saved.")
+        return
+    print("  ✅ Output check passed")
+
+    # ── Step 7: Save Report ───────────────────────────────────────────────────
+    print_section("STEP 7: Saving Report", "═")
     report_path = save_report(query, langgraph_result, crew_result)
     print(f"\n  💾 Report saved to: {report_path}")
 

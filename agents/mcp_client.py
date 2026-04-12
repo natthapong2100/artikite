@@ -62,6 +62,23 @@ async def _connect_async() -> None:
     _session = session
 
 
+async def _disconnect_async() -> None:
+    """Close the MCP session and stdio transport gracefully."""
+    global _session, _stdio_cm
+    if _session is not None:
+        try:
+            await _session.__aexit__(None, None, None)
+        except Exception:
+            pass
+        _session = None
+    if _stdio_cm is not None:
+        try:
+            await _stdio_cm.__aexit__(None, None, None)
+        except Exception:
+            pass
+        _stdio_cm = None
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def connect() -> None:
@@ -78,10 +95,28 @@ def connect() -> None:
     print("  [MCP] Connected to Museum MCP Server")
 
 
+def disconnect() -> None:
+    """
+    Close the MCP session and subprocess gracefully.
+    Safe to call even if not connected.
+    """
+    global _connected
+    if not _connected:
+        return
+    loop = _ensure_loop()
+    try:
+        asyncio.run_coroutine_threadsafe(_disconnect_async(), loop).result(timeout=10)
+    except Exception:
+        pass
+    _connected = False
+    print("  [MCP] Disconnected from Museum MCP Server")
+
+
 def call_tool(tool_name: str, arguments: dict) -> str:
     """
     Synchronously call an MCP tool on the museum server.
     Auto-connects on first call if connect() was not called explicitly.
+    Reconnects once automatically if the session has dropped.
 
     Args:
         tool_name:  MCP tool name (e.g. "search_met_artworks")
@@ -92,7 +127,8 @@ def call_tool(tool_name: str, arguments: dict) -> str:
     """
     if not _connected:
         connect()
-    try:
+
+    def _do_call() -> str:
         future = asyncio.run_coroutine_threadsafe(
             _session.call_tool(tool_name, arguments),
             _ensure_loop(),
@@ -100,5 +136,15 @@ def call_tool(tool_name: str, arguments: dict) -> str:
         result = future.result(timeout=30)
         texts = [c.text for c in (result.content or []) if hasattr(c, "text")]
         return "\n".join(texts) if texts else f"[MCP] No result from {tool_name}"
-    except Exception as e:
-        return f"[MCP] Error calling {tool_name}: {e}"
+
+    try:
+        return _do_call()
+    except Exception:
+        # Session may have dropped — disconnect, reconnect, retry once
+        print(f"  [MCP] Session lost, reconnecting...")
+        disconnect()
+        connect()
+        try:
+            return _do_call()
+        except Exception as e:
+            return f"[MCP] Error calling {tool_name}: {e}"
